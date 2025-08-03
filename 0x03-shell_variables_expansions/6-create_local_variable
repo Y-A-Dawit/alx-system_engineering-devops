@@ -1,6 +1,2 @@
 #!/bin/bash
-create_var() {
-    local BEST="School"
-    declare -p BEST
-}
-create_var
+local BEST="School"
