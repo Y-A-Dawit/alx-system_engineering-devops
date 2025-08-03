@@ -1,15 +1,2 @@
 #!/bin/bash
-# Replace empty entries with a placeholder, then count the colons + 1
-
-# Use parameter expansion to replace empty entries "::" with ":placeholder:"
-tmp="${PATH//::/:placeholder:}"
-
-# Also handle leading "::" or trailing "::"
-tmp="${tmp/#:/placeholder:}"
-tmp="${tmp/%/:/}:placeholder"
-
-# Count the number of colons (:) in $tmp
-count=$(echo -n "$tmp" | tr -cd ':' | wc -c)
-
-# Number of directories is colons + 1
-echo $((count + 1))
+echo "$PATH" | tr ':' '\n' | grep -c '.'
