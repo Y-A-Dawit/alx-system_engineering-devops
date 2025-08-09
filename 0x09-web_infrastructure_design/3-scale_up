@@ -1,0 +1,22 @@
+# 3-scale_up
+
+## Overview
+
+This infrastructure scales up the distributed web setup by adding:
+
+- **1 additional server** to improve capacity.
+- **HAProxy load balancer cluster** for redundancy and high availability.
+- **Split components** into separate servers:
+  - Web server (Nginx)
+  - Application server
+  - Database (MySQL)
+
+## Why these additions?
+
+- **Extra server**: Improves handling of increased traffic.
+- **HAProxy cluster**: Removes the single point of failure in load balancing.
+- **Splitting components**: Improves performance, allows independent scaling, and reduces resource contention.
+
+## Diagram
+
+<https://drive.google.com/file/d/1hWPiPY8Ez-5g6xb7SK_vC0vNGlkxccB0/view?usp=sharing>

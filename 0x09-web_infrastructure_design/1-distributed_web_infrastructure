@@ -1,0 +1,65 @@
+# 1-distributed_web_infrastructure
+
+User flow:
+
+1. User types "www.foobar.com" in their browser.
+2. DNS resolves "www.foobar.com" to the public IP of the load balancer.
+3. The load balancer (HAProxy) receives the request and distributes it to one of the backend servers using the configured algorithm.
+4. Backend servers run Nginx (web server) and forward dynamic requests to the application server component.
+5. Application server executes code from the shared application files and interacts with the database.
+6. Database is set up as a Primary-Replica (Master-Slave) cluster:
+   - Primary node handles all writes and read operations.
+   - Replica node handles read operations only, syncing data from the Primary asynchronously.
+7. Application sends the final response back to the user via the load balancer.
+
+New components and why they are added:
+
+- **Load Balancer (HAProxy)**: Distributes incoming requests across multiple servers to prevent overload and improve availability.
+- **Extra Server**: Provides redundancy—if one server fails, traffic can be routed to the other.
+- **Primary-Replica Database Setup**: Improves read scalability and provides a backup in case the primary fails.
+
+Load balancer distribution algorithm:
+
+- **Round Robin**: The load balancer cycles through the list of backend servers, sending each new connection to the next server in line. Ensures even distribution under normal traffic patterns.
+
+Active-Active vs Active-Passive:
+
+- **Active-Active**: Both servers actively handle traffic at the same time (what we use here). Increases capacity and resilience.
+- **Active-Passive**: One server actively handles all traffic while the other is on standby, only taking over if the active server fails.
+
+Primary-Replica (Master-Slave) database cluster:
+
+- The **Primary** node handles all write operations and propagates changes to the Replica.
+- The **Replica** node is read-only for the application and is used to offload read queries from the Primary.
+
+Difference between Primary and Replica for the application:
+
+- Primary: Used for CREATE, UPDATE, DELETE, and SELECT queries.
+- Replica: Used for SELECT queries only to reduce load on the Primary.
+
+Issues with this infrastructure:
+
+1. **SPOF**:
+   - Load balancer (if only one instance, it can fail).
+   - Primary database node (if it fails and replication is not promoted).
+2. **Security issues**:
+   - No firewall rules to restrict access.
+   - No HTTPS (traffic not encrypted).
+3. **No monitoring**:
+   - Without tools like Nagios, Prometheus, or Datadog, failures may go unnoticed.
+
+Diagram (text version):
+
+          [ User Browser ]
+                 |
+            DNS resolves
+                 |
+        [ Load Balancer (HAProxy) ]
+          /                   \
+  [ Web/App Server 1 ]   [ Web/App Server 2 ]
+       |                        |
+ [ Application Files ]   [ Application Files ]
+       |                        |
+       \-------[ MySQL Database Cluster ]-------
+                |                         |
+         [ Primary Node ]           [ Replica Node ]

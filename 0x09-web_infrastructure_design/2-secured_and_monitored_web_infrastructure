@@ -1,0 +1,90 @@
+# 2-secured_and_monitored_web_infrastructure
+
+Goal
+Design a 3-server web infrastructure for <http://www.foobar.com> that is secured, serves encrypted traffic (HTTPS), and is monitored.
+
+Architecture (text diagram)
+
+  [ User Browser ]
+        |
+  DNS -> <http://www.foobar.com> -> load-balancer public IP
+        |
+  [ Load Balancer / HAProxy ]  (SSL termination)
+        |
+   +-----------+-----------+
+   |           |           |
+[Server 1]  [Server 2]  [Server 3]
+ firewall     firewall     firewall
+ monitoring   monitoring   monitoring
+  nginx        nginx        nginx
+  app          app          app
+  (app files deployed to each web/app server)
+        |
+  MySQL (Primary) <- asynchronous replication -> MySQL (Replica)
+  (writes here)                            (reads / failover backup)
+
+Added elements & why
+
+- 3 Firewalls: one per server (network/host firewall). They limit allowed ports (HTTP/HTTPS, SSH from admin IPs, LB health checks), reducing the attack surface.
+- 1 SSL certificate: terminates TLS for <http://www.foobar.com>, ensuring traffic is encrypted in transit (confidentiality and integrity).
+- 3 Monitoring clients (one per server): lightweight agents (Sumo Logic / Prometheus node exporters / Datadog agents) that collect metrics/logs and forward to the monitoring backend for alerting and dashboards.
+
+What firewalls are for
+
+- Block unwanted traffic and restrict access to only necessary services (e.g., allow 80/443 from LB, allow SSH only from admin IP).
+- Provide layered defence (network + host-based filtering).
+
+Why traffic is served over HTTPS
+
+- Encrypts data in transit to prevent eavesdropping and tampering.
+- Required for secure cookies, OAuth flows, and modern browser security features.
+- Lets the site present a valid certificate (improves user trust and SEO).
+
+What monitoring is used for / how data collection works
+
+- Monitoring clients (agents) run on each server, collecting:
+  - Metrics: CPU, memory, disk, network, process stats (exported via Prometheus client or pushed).
+  - Application metrics: request count, latency, error rates, DB query times (exposed via an endpoint or pushed).
+  - Logs: Nginx access/error logs, app logs (collected and forwarded).
+- Agents forward data to a central monitoring service (Sumo Logic, Datadog, Prometheus + Grafana, etc.) over secure channels.
+- The monitoring backend stores metrics, generates dashboards, and triggers alerts when thresholds are exceeded.
+
+How to monitor QPS (Queries Per Second) for your web server
+
+- Expose or parse Nginx access logs or use exporter:
+  - Option A: Configure Nginx stub_status or use ngx_http_status_module to get active connections and requests.
+  - Option B: Use an exporter (e.g., nginx-prometheus-exporter) to expose `nginx_http_requests_total` and compute QPS as the per-second rate.
+  - Option C: Parse access logs and send aggregated counts to the monitoring backend (e.g., push request counts every 10s).
+- Create a dashboard panel that shows requests/sec (rate of `requests_total`) and alert on sustained spikes or drops.
+
+Security & operational issues (what’s still wrong or risky)
+
+1. **SSL termination at the load balancer is an issue**  
+   - If you terminate SSL at the LB, traffic between LB and backend may be unencrypted unless you re-encrypt it. That internal cleartext path may expose sensitive data in case of network compromise. Mitigation: use TLS between LB and backends (re-encrypt) or use a private network/VPC with strict controls.
+
+2. **Only one MySQL server accepts writes (Primary single write-capable node)**  
+   - The primary DB is a SPOF for writes. If it fails, writes stop until you promote a replica. Mitigation: implement automated failover (e.g., MGR/Group Replication, Galera, or orchestrator-based promotion), backups, and multi-AZ DB replication.
+
+3. **Servers having all same components (db + web + app) might be a problem**  
+   - Running identical stacks (web+app+db) on each server causes resource contention and complicates scaling and isolation. It increases blast radius: a buggy app update could affect DB on the same host. Better: separate roles (dedicated DB hosts, stateless app/web hosts) or use orchestration (containers/k8s) to isolate concerns.
+
+Other SPOFs & problems
+
+- Single load balancer instance is a SPOF. Use two LBs with floating IP/VRRP or cloud LB service.
+- Monitoring agent misconfiguration means issues go undetected.
+- No WAF, no rate-limiting, no IDS/IPS.
+- No backups / no tested disaster recovery procedures.
+
+Practical notes & recommendations
+
+- Enable HTTPS end-to-end (TLS at LB + TLS between LB and backends) or use a private-secured network for LB→backends.
+- Harden firewalls (deny-by-default), rotate keys, use least privilege for DB users.
+- Use centralized logging, metrics, and alerts (SLOs/SLA) and set up runbooks for common failures (e.g., DB promotion).
+- Use a dedicated DB host or managed DB service for production to reduce operational burden.
+- Add a second load balancer (Active-Active or floating IP Active-Passive) to remove LB SPOF.
+- Use automated deployment pipelines that support canary or blue/green deploys to avoid service disruption.
+
+Diagram URL
+
+- Place your diagram image URL here for the ALX checker (example placeholder):
+  <https://drive.google.com/file/d/1UzWcNZJEKES3OEIiWOzaqVIW0mBqWy1a/view?usp=sharing>
